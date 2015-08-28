@@ -3,6 +3,8 @@ using System.Text;
 using System.Diagnostics;
 using System.IO;
 using System.Configuration;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 
 namespace rpmkit
 {
@@ -41,6 +43,9 @@ namespace rpmkit
                     case "compareTime":
                         func_compareTime(attributeNumber, args[2]);
                         break;
+                    case "BCX_PS_MailFlow":
+                        func_BCX_PS_MailFlow(attributeNumber, args[2], args[3], args[4], args[5]);
+                        break;
                     default:
                         Console.WriteLine("No 'functioname' provided or unable to locate function requested");
                         break;
@@ -49,6 +54,52 @@ namespace rpmkit
             catch (Exception exc)
             {
                 Util.writeLog("main", "EXCEPTION : " + exc.Message.ToString(), false);
+                Console.WriteLine(exc.Message.ToString());
+            }
+        }
+
+
+        static void func_BCX_PS_MailFlow(int attributeNumber, string serverName, string TargetEmail, string ScriptName, string fieldCheck) 
+        {
+            try
+            {
+                RunspaceConfiguration runspaceConfiguration = RunspaceConfiguration.Create();
+
+                Runspace runspace = RunspaceFactory.CreateRunspace(runspaceConfiguration);
+                runspace.Open();
+
+                RunspaceInvoke scriptInvoker = new RunspaceInvoke(runspace);
+                scriptInvoker.Invoke("Set-ExecutionPolicy Unrestricted");
+
+                Pipeline pipeline = runspace.CreatePipeline();
+
+                //Here's how you add a new script with arguments
+                Command myCommand = new Command(ScriptName);
+                CommandParameter servername = new CommandParameter(serverName);
+                myCommand.Parameters.Add(servername);
+                CommandParameter targetEmail = new CommandParameter("TargetEmailAddress", TargetEmail);
+                myCommand.Parameters.Add(targetEmail);
+
+                pipeline.Commands.Add(myCommand);
+
+                // Execute PowerShell script
+                Util.writeLog("func_BCX_PS_MailFlow", "Run Script : " + ScriptName, false);
+                var results = pipeline.Invoke();                
+                foreach (var item in results)
+                {
+                    string value = item.ToString();
+                    if (value.Contains(fieldCheck))
+                    {
+                        Util.writeLog("func_BCX_PS_MailFlow", "Found field : " + fieldCheck, true);
+                        string[] arrValue = value.Split(':');
+                        Util.writeLog("func_BCX_PS_MailFlow", "Field value : " + arrValue[1].Trim(),true);
+                        Util.writeRPMDatFile(attributeNumber, arrValue[1].Trim());
+                    }                    
+                }
+            }
+            catch (Exception exc)
+            {
+                Util.writeLog("func_BCX_PS_MailFlow", "EXCEPTION : " + exc.Message.ToString(), false);
                 Console.WriteLine(exc.Message.ToString());
             }
         }
@@ -93,6 +144,7 @@ namespace rpmkit
         {
             try
             {
+                
                 Util.writeRPMDatFile(attributeNumber, "1");
             }
             catch (Exception exc)
