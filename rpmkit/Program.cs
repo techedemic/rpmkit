@@ -37,15 +37,18 @@ namespace rpmkit
 
                 switch (rpmFunction)
                 {
+                    case "readFile":
+                        func_readFile(attributeNumber, args[2]);
+                        break;
                     case "randomNumber":
                         func_randomNumber(attributeNumber, int.Parse(args[2]), int.Parse(args[3]));
                         break;
                     case "compareTime":
                         func_compareTime(attributeNumber, args[2]);
                         break;
-                    case "BCX_PS_MailFlow":
-                        func_BCX_PS_MailFlow(attributeNumber, args[2], args[3], args[4], args[5]);
-                        break;
+                    //case "BCX_PS_MailFlow":
+                    //    func_BCX_PS_MailFlow(attributeNumber, args[2], args[3], args[4], args[5]);
+                    //    break;
                     default:
                         Console.WriteLine("No 'functioname' provided or unable to locate function requested");
                         break;
@@ -54,55 +57,45 @@ namespace rpmkit
             catch (Exception exc)
             {
                 Util.writeLog("main", "EXCEPTION : " + exc.Message.ToString(), false);
+                Util.writeRPMDatFile(int.Parse(args[0]), "EXCEPTION : " + exc.Message.ToString());
                 Console.WriteLine(exc.Message.ToString());
             }
         }
 
+        /// <summary>
+        /// The func_readFile() function will take two arguments
+        /// attributeNumber (int) - The value of the attribute number which should be passed through by the main method
+        /// fileName (string) - The name of the file, normally in 'C:\sintelligent\RPMScripts\Results\', that will hold the value to be plotted. 
+        /// </summary>
 
-        static void func_BCX_PS_MailFlow(int attributeNumber, string serverName, string TargetEmail, string ScriptName, string fieldCheck) 
+        static void func_readFile(int attributeNumber, string fileName)
         {
             try
             {
-                RunspaceConfiguration runspaceConfiguration = RunspaceConfiguration.Create();
-
-                Runspace runspace = RunspaceFactory.CreateRunspace(runspaceConfiguration);
-                runspace.Open();
-
-                RunspaceInvoke scriptInvoker = new RunspaceInvoke(runspace);
-                scriptInvoker.Invoke("Set-ExecutionPolicy Unrestricted");
-
-                Pipeline pipeline = runspace.CreatePipeline();
-
-                //Here's how you add a new script with arguments
-                Command myCommand = new Command(ScriptName);
-                CommandParameter servername = new CommandParameter(serverName);
-                myCommand.Parameters.Add(servername);
-                CommandParameter targetEmail = new CommandParameter("TargetEmailAddress", TargetEmail);
-                myCommand.Parameters.Add(targetEmail);
-
-                pipeline.Commands.Add(myCommand);
-
-                // Execute PowerShell script
-                Util.writeLog("func_BCX_PS_MailFlow", "Run Script : " + ScriptName, false);
-                var results = pipeline.Invoke();                
-                foreach (var item in results)
-                {
-                    string value = item.ToString();
-                    if (value.Contains(fieldCheck))
-                    {
-                        Util.writeLog("func_BCX_PS_MailFlow", "Found field : " + fieldCheck, true);
-                        string[] arrValue = value.Split(':');
-                        Util.writeLog("func_BCX_PS_MailFlow", "Field value : " + arrValue[1].Trim(),true);
-                        Util.writeRPMDatFile(attributeNumber, arrValue[1].Trim());
-                    }                    
-                }
+                Util.writeLog("func_readFile", "Read from file : " + fileName, true);
+                string text = File.ReadAllText(@"results/" + fileName); // Read value from results folder - fileName is the file to use. It should contain nothing but the value that should be returned. 
+                Util.writeRPMDatFile(attributeNumber, text.Trim());
+                Util.writeLog("func_readFile", "Wrote to .dat. Value : " + text.Trim(), true);
             }
-            catch (Exception exc)
+            catch (FileNotFoundException exc)           // If the file provided as per the parameter is not found
             {
-                Util.writeLog("func_BCX_PS_MailFlow", "EXCEPTION : " + exc.Message.ToString(), false);
+                Util.writeLog("func_readFile", "EXCEPTION : File not found - Ensure you are referencing the correct file", false);
+                Util.writeLog("func_readFile", "EXCEPTION : " + exc.Message.ToString(), false);
+                Console.WriteLine(exc.Message.ToString());
+            }
+            catch (DirectoryNotFoundException exc)      // Normally occurs if the 'results' directory does not exist.
+            {
+                Util.writeLog("func_readFile", "EXCEPTION : Directory not found - Ensure you have a directory names 'results' in your RPM script location.", false);
+                Util.writeLog("func_readFile", "EXCEPTION : " + exc.Message.ToString(), false);
+            }
+            catch (Exception exc)                       // Any other exceptions
+            {
+                Util.writeLog("func_readFile", "EXCEPTION : " + exc.Message.ToString(), false);
                 Console.WriteLine(exc.Message.ToString());
             }
         }
+
+        
 
         /// <summary>
         /// The func_compareTime() function will take two arguments
@@ -140,22 +133,6 @@ namespace rpmkit
             }
         }
 
-        static void func_SqlDbaseTime(int attributeNumber)
-        {
-            try
-            {
-                
-                Util.writeRPMDatFile(attributeNumber, "1");
-            }
-            catch (Exception exc)
-            {
-                Util.writeLog("func_SqlDbaseTime", "EXCEPTION : " + exc.Message.ToString(), false);
-                Console.WriteLine(exc.Message.ToString());
-            }
-
-
-        }
-
         static void func_randomNumber(int attributeNumber, int param1, int param2)
         {
             int startNumber = param1;
@@ -167,6 +144,52 @@ namespace rpmkit
             Util.writeLog("func_randomNumber", "randomNumber = " + randomNumber, true);
             Util.writeRPMDatFile(attributeNumber, randomNumber.ToString());
         }
+
+       /* static void func_BCX_PS_MailFlow(int attributeNumber, string serverName, string TargetEmail, string ScriptName, string fieldCheck)
+        {
+            try
+            {
+                RunspaceConfiguration runspaceConfiguration = RunspaceConfiguration.Create();
+
+                Runspace runspace = RunspaceFactory.CreateRunspace(runspaceConfiguration);
+                runspace.Open();
+
+                RunspaceInvoke scriptInvoker = new RunspaceInvoke(runspace);
+                scriptInvoker.Invoke("Set-ExecutionPolicy Unrestricted");
+
+                Pipeline pipeline = runspace.CreatePipeline();
+
+                //Here's how you add a new script with arguments
+                Command myCommand = new Command(ScriptName);
+                CommandParameter servername = new CommandParameter(serverName);
+                myCommand.Parameters.Add(servername);
+                CommandParameter targetEmail = new CommandParameter("TargetEmailAddress", TargetEmail);
+                myCommand.Parameters.Add(targetEmail);
+
+                pipeline.Commands.Add(myCommand);
+
+                // Execute PowerShell script
+                Util.writeLog("func_BCX_PS_MailFlow", "Run Script : " + ScriptName, false);
+                var results = pipeline.Invoke();
+                foreach (var item in results)
+                {
+                    string value = item.ToString();
+                    if (value.Contains(fieldCheck))
+                    {
+                        Util.writeLog("func_BCX_PS_MailFlow", "Found field : " + fieldCheck, true);
+                        string[] arrValue = value.Split(':');
+                        Util.writeLog("func_BCX_PS_MailFlow", "Field value : " + arrValue[1].Trim(), true);
+                        Util.writeRPMDatFile(attributeNumber, arrValue[1].Trim());
+                    }
+                }
+                runspace.Close();
+            }
+            catch (Exception exc)
+            {
+                Util.writeLog("func_BCX_PS_MailFlow", "EXCEPTION : " + exc.Message.ToString(), false);
+                Console.WriteLine(exc.Message.ToString());
+            }
+        }*/
     }
 
 }
